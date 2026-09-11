@@ -1,0 +1,61 @@
+name: Publicar en Instagram
+
+# Todos los días a las 6:30 de RD (10:30 UTC). publicar.py espera hasta las 7:00
+# en punto: GitHub dispara los cron tarde, nunca antes, así que se arranca con
+# margen. Si hoy no hay nada aprobado en la cola, termina en verde sin tocar nada.
+on:
+  schedule:
+    - cron: "30 10 * * *"
+  workflow_dispatch:
+    inputs:
+      prueba:
+        description: "Prueba: hace todo menos publicar"
+        type: boolean
+        default: true
+      fecha:
+        description: "Entrada de la cola, AAAA-MM-DD (vacío = hoy en RD)"
+        type: string
+        default: ""
+
+permissions:
+  contents: write          # para guardar PUBLICADO.json
+
+concurrency:
+  group: publicar
+  cancel-in-progress: false
+
+jobs:
+  publicar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 150
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - run: pip install --quiet requests
+
+      - name: Publicar lo que toque hoy
+        env:
+          IG_TOKEN: ${{ secrets.IG_TOKEN }}
+          IG_USER_ID: ${{ secrets.IG_USER_ID }}
+          IG_TOKEN_EXPIRA: ${{ vars.IG_TOKEN_EXPIRA }}
+          GH_TOKEN: ${{ secrets.GH_PAT }}
+          PRUEBA: ${{ github.event_name == 'workflow_dispatch' && inputs.prueba && 'true' || 'false' }}
+          FECHA: ${{ inputs.fecha }}
+        run: python3 publicar.py
+
+      # always(): si se publicó y algo falló después, el registro tiene que
+      # quedar igual, o relanzar el job lo publicaría dos veces.
+      - name: Guardar PUBLICADO.json
+        if: always()
+        run: |
+          if [ -n "$(git status --porcelain cola)" ]; then
+            git config user.name "ig-cola"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add cola
+            git commit -m "publicado $(date -u +%F)"
+            git push
+          fi
