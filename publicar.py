@@ -96,9 +96,14 @@ def urls_publicas(fecha, lista):
     una URL a Meta se comprueba que devuelve 200 y un JPEG de verdad, porque si
     falla la descarga Meta solo dice «media download has failed».
     """
+    import subprocess
     import requests
     repo = os.environ["GITHUB_REPOSITORY"]
-    sha = os.environ["GITHUB_SHA"]
+    # El commit que hay de verdad en disco, no GITHUB_SHA: el workflow hace
+    # checkout de la punta de la rama, que puede ser más nueva que el disparo.
+    sha = subprocess.run(["git", "-C", str(RAIZ), "rev-parse", "HEAD"],
+                         capture_output=True, text=True).stdout.strip() \
+        or os.environ["GITHUB_SHA"]
     bases = [f"https://cdn.jsdelivr.net/gh/{repo}@{sha}/cola/{fecha}",
              f"https://raw.githubusercontent.com/{repo}/{sha}/cola/{fecha}"]
     salida = []

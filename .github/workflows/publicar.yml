@@ -1,11 +1,18 @@
 name: Publicar en Instagram
 
-# Todos los días a las 6:30 de RD (10:30 UTC). publicar.py espera hasta las 7:00
-# en punto: GitHub dispara los cron tarde, nunca antes, así que se arranca con
-# margen. Si hoy no hay nada aprobado en la cola, termina en verde sin tocar nada.
+# Todos los días desde las 6:00 de RD (10:00 UTC). publicar.py espera hasta las
+# 7:00 en punto. Si hoy no hay nada aprobado en la cola, termina en verde sin
+# tocar nada.
+#
+# TRES disparos y no uno: el primer cron de este repo (12 sep 2026) estaba
+# puesto a las 10:30 UTC y GitHub lo lanzó a las 13:41, tres horas tarde. Con
+# varios, el primero que llegue publica; los demás esperan su turno por la
+# `concurrency`, ven el PUBLICADO.json y no repiten.
 on:
   schedule:
-    - cron: "30 10 * * *"
+    - cron: "0 10 * * *"
+    - cron: "20 10 * * *"
+    - cron: "40 10 * * *"
   workflow_dispatch:
     inputs:
       prueba:
@@ -29,7 +36,12 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 150
     steps:
+      # La punta de la rama en el momento de arrancar, no el commit del disparo:
+      # si otro disparo ya publicó mientras este esperaba en la cola, aquí tiene
+      # que aparecer su PUBLICADO.json, o saldría el post dos veces.
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.repository.default_branch }}
 
       - uses: actions/setup-python@v5
         with:
